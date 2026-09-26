@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!-- GaussianCam with the model base currency forced to EUR, i.e. the pair's SOURCE (base) currency - the model carries the RECIPROCAL, FX-GENERIC-GBP-EUR.
+
+     EnforceBaseCcy is what makes the base currency observable here. With it left at false and a
+     single FX index in the script, ScriptedTradeEngineBuilder::determineBaseCcy() ignores BaseCcy
+     and always picks the index's target currency (scriptedtrade.cpp:822-827), which is the
+     orientation that works. In an AMC/exposure run no such flag is needed: the base currency is
+     overwritten with the CrossAssetModel's domestic currency (scriptedtrade.cpp:899-911), so
+     whichever currency is first in the simulation's currency list decides this. -->
+<PricingEngines>
+  <Product type="ScriptedTrade">
+    <Model>Generic</Model>
+    <ModelParameters>
+      <Parameter name="Model">GaussianCam</Parameter>
+      <Parameter name="BaseCcy">EUR</Parameter>
+      <Parameter name="EnforceBaseCcy">true</Parameter>
+      <Parameter name="GridCoarsening">3M(1W),1Y(1M),5Y(3M),10Y(1Y),50Y(5Y)</Parameter>
+      <Parameter name="IrReversion_EUR">0.01</Parameter>
+      <Parameter name="IrReversion_GBP">0.01</Parameter>
+      <Parameter name="FullDynamicFx">true</Parameter>
+      <!-- Zero-vol IR keeps the model a pure FX Black-Scholes, so the only thing that differs
+           between the two runs below is the orientation of the FX index. -->
+      <Parameter name="FullDynamicIr">false</Parameter>
+    </ModelParameters>
+    <Engine>Generic</Engine>
+    <EngineParameters>
+      <Parameter name="Engine">MC</Parameter>
+      <Parameter name="Samples">50000</Parameter>
+      <Parameter name="RegressionOrder">4</Parameter>
+      <Parameter name="TimeStepsPerYear">24</Parameter>
+      <Parameter name="Interactive">false</Parameter>
+      <Parameter name="BootstrapTolerance">1.0</Parameter>
+      <Parameter name="ZeroVolatility">false</Parameter>
+    </EngineParameters>
+  </Product>
+</PricingEngines>

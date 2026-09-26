@@ -1,0 +1,195 @@
+<?xml version="1.0"?>
+<!-- Two up-and-out FX barrier calls on EUR/GBP that differ ONLY in how the barrier is
+     monitored between the monitoring dates:
+
+       FX_BARRIER_CONTINUOUS   ABOVEPROB(...) - the Brownian-bridge crossing probability,
+                               i.e. genuinely continuous ("American") monitoring
+       FX_BARRIER_DISCRETE     the plain level test on the same dates, i.e. European
+                               monitoring, the approximation ABOVEPROB is meant to replace
+
+     Both observe the same dates (StartDate, BarrierDates, Expiry), so they share one model
+     time grid and one set of paths and their NPVs are comparable path by path. The continuous
+     one must be worth strictly less: it knocks out on every path the discrete one kills, plus
+     the paths that cross in between two monitoring dates and come back. -->
+<Portfolio>
+
+  <Trade id="FX_BARRIER_CONTINUOUS">
+    <TradeType>ScriptedTrade</TradeType>
+    <Envelope>
+      <CounterParty>CPTY_A</CounterParty>
+      <NettingSetId>CPTY_A</NettingSetId>
+      <AdditionalFields/>
+    </Envelope>
+    <ScriptedTradeData>
+      <ProductTag>SingleAssetOption(FX)</ProductTag>
+      <Script>
+        <Code><![CDATA[
+          NUMBER Alive, d, payoff;
+          Alive = 1;
+          FOR d IN (1, SIZE(BarrierDates), 1) DO
+            IF d == 1 THEN
+              Alive = Alive * (1 - ABOVEPROB(Underlying, StartDate, BarrierDates[d], BarrierLevel));
+            ELSE
+              Alive = Alive * (1 - ABOVEPROB(Underlying, BarrierDates[d-1], BarrierDates[d], BarrierLevel));
+            END;
+          END;
+          payoff = Alive * Quantity * max(Underlying(Expiry) - Strike, 0);
+          value = PAY(payoff, Expiry, Settlement, PayCcy);
+        ]]></Code>
+        <NPV>value</NPV>
+        <Results>
+          <Result>Alive</Result>
+        </Results>
+        <CalibrationSpec>
+          <Calibration>
+            <Index>Underlying</Index>
+            <Strikes>
+              <Strike>Strike</Strike>
+              <Strike>BarrierLevel</Strike>
+            </Strikes>
+          </Calibration>
+        </CalibrationSpec>
+      </Script>
+      <Data>
+        <Event>
+          <Name>StartDate</Name>
+          <Value>2016-02-05</Value>
+        </Event>
+        <Event>
+          <Name>Expiry</Name>
+          <Value>2017-02-06</Value>
+        </Event>
+        <Event>
+          <Name>Settlement</Name>
+          <Value>2017-02-08</Value>
+        </Event>
+        <Event>
+          <Name>BarrierDates</Name>
+          <ScheduleData>
+            <Rules>
+              <StartDate>2016-03-07</StartDate>
+              <EndDate>2017-02-06</EndDate>
+              <Tenor>1M</Tenor>
+              <Calendar>TARGET</Calendar>
+              <Convention>F</Convention>
+              <TermConvention>F</TermConvention>
+              <Rule>Forward</Rule>
+            </Rules>
+          </ScheduleData>
+        </Event>
+        <Number>
+          <Name>Strike</Name>
+          <Value>0.82</Value>
+        </Number>
+        <Number>
+          <Name>BarrierLevel</Name>
+          <Value>0.88</Value>
+        </Number>
+        <Number>
+          <Name>Quantity</Name>
+          <Value>1000000</Value>
+        </Number>
+        <Index>
+          <Name>Underlying</Name>
+          <Value>FX-GENERIC-EUR-GBP</Value>
+        </Index>
+        <Currency>
+          <Name>PayCcy</Name>
+          <Value>GBP</Value>
+        </Currency>
+      </Data>
+    </ScriptedTradeData>
+  </Trade>
+
+  <Trade id="FX_BARRIER_DISCRETE">
+    <TradeType>ScriptedTrade</TradeType>
+    <Envelope>
+      <CounterParty>CPTY_A</CounterParty>
+      <NettingSetId>CPTY_A</NettingSetId>
+      <AdditionalFields/>
+    </Envelope>
+    <ScriptedTradeData>
+      <ProductTag>SingleAssetOption(FX)</ProductTag>
+      <Script>
+        <Code><![CDATA[
+          NUMBER Alive, d, u, payoff;
+          Alive = 1;
+          u = Underlying(StartDate);
+          IF u >= BarrierLevel THEN
+            Alive = 0;
+          END;
+          FOR d IN (1, SIZE(BarrierDates), 1) DO
+            u = Underlying(BarrierDates[d]);
+            IF u >= BarrierLevel THEN
+              Alive = 0;
+            END;
+          END;
+          payoff = Alive * Quantity * max(Underlying(Expiry) - Strike, 0);
+          value = PAY(payoff, Expiry, Settlement, PayCcy);
+        ]]></Code>
+        <NPV>value</NPV>
+        <Results>
+          <Result>Alive</Result>
+        </Results>
+        <CalibrationSpec>
+          <Calibration>
+            <Index>Underlying</Index>
+            <Strikes>
+              <Strike>Strike</Strike>
+              <Strike>BarrierLevel</Strike>
+            </Strikes>
+          </Calibration>
+        </CalibrationSpec>
+      </Script>
+      <Data>
+        <Event>
+          <Name>StartDate</Name>
+          <Value>2016-02-05</Value>
+        </Event>
+        <Event>
+          <Name>Expiry</Name>
+          <Value>2017-02-06</Value>
+        </Event>
+        <Event>
+          <Name>Settlement</Name>
+          <Value>2017-02-08</Value>
+        </Event>
+        <Event>
+          <Name>BarrierDates</Name>
+          <ScheduleData>
+            <Rules>
+              <StartDate>2016-03-07</StartDate>
+              <EndDate>2017-02-06</EndDate>
+              <Tenor>1M</Tenor>
+              <Calendar>TARGET</Calendar>
+              <Convention>F</Convention>
+              <TermConvention>F</TermConvention>
+              <Rule>Forward</Rule>
+            </Rules>
+          </ScheduleData>
+        </Event>
+        <Number>
+          <Name>Strike</Name>
+          <Value>0.82</Value>
+        </Number>
+        <Number>
+          <Name>BarrierLevel</Name>
+          <Value>0.88</Value>
+        </Number>
+        <Number>
+          <Name>Quantity</Name>
+          <Value>1000000</Value>
+        </Number>
+        <Index>
+          <Name>Underlying</Name>
+          <Value>FX-GENERIC-EUR-GBP</Value>
+        </Index>
+        <Currency>
+          <Name>PayCcy</Name>
+          <Value>GBP</Value>
+        </Currency>
+      </Data>
+    </ScriptedTradeData>
+  </Trade>
+
+</Portfolio>
