@@ -874,34 +874,36 @@ RandomVariable GaussianCam::getFutureBarrierProb(const std::string& index, const
     // get the integrated variance of log(S) over [obsdate1, obsdate2] from the CAM parametrisation
     Real t1 = timeFromReference(obsdate1);
     Real t2 = timeFromReference(obsdate2);
-    Real variance = 0.0;
+    Real var1 = 0.0, var2 = 0.0, covar = 0.0;
+    Size ccyIdx1 = Null<Size>(), ccyIdx2 = Null<Size>();
 
-    if (ind1 != Null<Size>() && ind2 == Null<Size>()) {
+    if (ind1 != Null<Size>()) {
         // index found directly in indices_
         if (indices_[ind1].isFx()) {
-            Size ccyIdx = cam_->ccyIndex(parseCurrency(indexCurrencies_[ind1]));
-            QL_REQUIRE(ccyIdx > 0, "GaussianCam::getFutureBarrierProb(): FX index is base currency");
-            variance = cam_->fxbs(ccyIdx - 1)->variance(t2) - cam_->fxbs(ccyIdx - 1)->variance(t1);
+            ccyIdx1 = cam_->ccyIndex(parseCurrency(indexCurrencies_[ind1]));
+            QL_REQUIRE(ccyIdx1 > 0, "GaussianCam::getFutureBarrierProb(): FX index is base currency");
+            var1 = cam_->fxbs(ccyIdx1 - 1)->variance(t2) - cam_->fxbs(ccyIdx1 - 1)->variance(t1);
         } else if (eqIndexInCam_[ind1] != Null<Size>()) {
-            variance = cam_->eqbs(eqIndexInCam_[ind1])->variance(t2) -
-                       cam_->eqbs(eqIndexInCam_[ind1])->variance(t1);
+            var1 = cam_->eqbs(eqIndexInCam_[ind1])->variance(t2) -
+                   cam_->eqbs(eqIndexInCam_[ind1])->variance(t1);
         } else {
             QL_FAIL("GaussianCam::getFutureBarrierProb(): index '" << index << "' is not FX or EQ");
         }
-    } else if (ind1 != Null<Size>() && ind2 != Null<Size>()) {
+    }
+    if (ind2 != Null<Size>()) {
+        // ind2 is always an FX index slot
+        ccyIdx2 = cam_->ccyIndex(parseCurrency(indexCurrencies_[ind2]));
+        QL_REQUIRE(ccyIdx2 > 0, "GaussianCam::getFutureBarrierProb(): FX index is base currency");
+        var2 = cam_->fxbs(ccyIdx2 - 1)->variance(t2) - cam_->fxbs(ccyIdx2 - 1)->variance(t1);
+    }
+    if (ccyIdx1 != Null<Size>() && ccyIdx2 != Null<Size>()) {
         // triangulated FX: log(S1/S2) = log(S1/base) - log(S2/base)
-        // variance = var1 + var2 - 2 * corr * sqrt(var1 * var2)
-        Size ccyIdx1 = cam_->ccyIndex(parseCurrency(indexCurrencies_[ind1]));
-        Size ccyIdx2 = cam_->ccyIndex(parseCurrency(indexCurrencies_[ind2]));
-        QL_REQUIRE(ccyIdx1 > 0 && ccyIdx2 > 0,
-                   "GaussianCam::getFutureBarrierProb(): triangulated FX index leg is base currency");
-        Real var1 = cam_->fxbs(ccyIdx1 - 1)->variance(t2) - cam_->fxbs(ccyIdx1 - 1)->variance(t1);
-        Real var2 = cam_->fxbs(ccyIdx2 - 1)->variance(t2) - cam_->fxbs(ccyIdx2 - 1)->variance(t1);
         Real corr = cam_->correlation(CrossAssetModel::AssetType::FX, ccyIdx1 - 1,
                                       CrossAssetModel::AssetType::FX, ccyIdx2 - 1);
-        variance = var1 + var2 - 2.0 * corr * std::sqrt(var1 * var2);
+        covar = corr * std::sqrt(var1 * var2);
     }
     // if both ind1 and ind2 are null (trivial CCY-CCY FX), variance stays zero
+    Real variance = var1 + var2 - 2.0 * covar;
 
     // apply the reflection principle to estimate the continuous barrier hit probability
     // see e.g. formulas 2, 4 in Emmanuel Gobet, Advanced Monte Carlo methods for barrier and related exotic options
